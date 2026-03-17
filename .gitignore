@@ -1,2 +1,24 @@
-.DS_Store
+# Virtual environments
 .venv/
+venv/
+
+# Python 
+__pycache__/
+*.py[codz]
+
+# macOS system files
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Data files
+*.npy
+*.csv
+*.png
