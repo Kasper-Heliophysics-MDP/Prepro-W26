@@ -46,9 +46,14 @@ def persistence_score(S, mu, sigma, k=2.0):
 
 # computer persistence scores 
 
-# classify channels 
 
-# build supression mask 
+def classify_channels(P, alpha = 0.4) :
+    return (P > alpha).astype(int)
+
+# Binary mask: 1 = suppress, 0 = keep
+def build_suppression_mask(P, alpha = 0.4):
+    M = (P > alpha).astype(int)
+    return M
 
 # supress persistent channels 
 
