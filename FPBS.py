@@ -5,7 +5,11 @@ Author: Zoe Fisch (zoefisch@umich.edu), Ella Ricci (earicci@umich.edu), Maria He
 Date: 2026-3-17
 Group: University of Michigan SunRISE Mission
 
-Description:
+Description: Frequency-Persistent Background Suppression is the third stage of our preprocessing pipeline. 
+By systematically addressing frequency-dependent artifacts while preserving transient burst signals, 
+FPBS will improve the quality of data available to downstream detection and classification algorithms, 
+ultimately enhancing our ability to study solar radio emissions. 
+
 
 ===============================================================================
 '''
