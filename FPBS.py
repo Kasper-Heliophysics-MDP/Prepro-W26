@@ -41,9 +41,6 @@ def compute_persistence_scores(S, k=2.0):
     P = persistence_score(S, mu, sigma, k=k)
     return P, mu, sigma
 
-def classify_channels(P, alpha = 0.4):
-    return (P > alpha).astype(int)
-
 # Binary mask: 1 = suppress, 0 = keep
 def build_suppression_mask(P, alpha = 0.4):
     M = (P > alpha).astype(int)
@@ -56,6 +53,8 @@ def suppress_persistent_channels(S, M):
     S: spectrogram (F x T)
     M: mask (F,) where 1 = suppress
     """
+    if M.shape[0] != S.shape[0]:
+        raise ValueError("Mask must have the same number of frequencies as spectrogram")
     S_clean = S.copy()
     F, T = S.shape
 
@@ -72,7 +71,7 @@ def suppress_persistent_channels(S, M):
 
     return S_clean
 
-def reconstruct_spectogram(S_original, S_clean, M):
+def reconstruct_spectrogram(S_original, S_clean, M):
     # Combine suppressed background with preserved signals.
     # Currectly equivalent to S_clean, but structured for functionality
     # Future: could blend instead of hard replace
@@ -91,7 +90,27 @@ def run_fpbs(S, k=2.0, alpha=0.4):
     P, mu, sigma = compute_persistence_scores(S, k=k)
     M = build_suppression_mask(P, alpha=alpha)
     S_clean = suppress_persistent_channels(S, M)
-    S_final = reconstruct_spectogram(S, S_clean, M)
+    S_final = reconstruct_spectrogram(S, S_clean, M)
     return S_final, P, M, mu, sigma
 
-# evaluation 
+def frequency_variance(S):
+    mean_per_freq = np.mean(S, axis=1)
+    return np.var(mean_per_freq)
+
+def compute_snr(signal, noise):
+    return np.mean(signal) / (np.std(noise) + 1e-8)
+
+def false_suppression_rate(S_before, S_after):
+    E_before = np.sum(S_before ** 2)
+    E_after = np.sum(S_after ** 2)
+    return E_after / (E_before + 1e-8)
+
+
+if __name__ == "__main__":
+    # Example usage
+    S = np.random.rand(100, 300) # fake spectrogram
+    S_clean, P, M, mu, sigma = run_fpbs(S)
+    print("FPBS completed")
+    print("Persistence scores shape:", P.shape)
+    print("Mask sum (suppressed channels):", np.sum(M))
+
