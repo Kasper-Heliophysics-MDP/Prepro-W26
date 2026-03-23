@@ -56,6 +56,28 @@ def build_suppression_mask(P, alpha = 0.4):
     return M
 
 # supress persistent channels 
+def suppress_persistent_channels(S, M):
+    """
+    Apply frequency-aware suppression using interpolation.
+    
+    S: spectrogram (F x T)
+    M: mask (F,) where 1 = suppress
+    """
+    S_clean = S.copy()
+    F, T = S.shape
+
+    for f in range(F):
+        if M[f] == 1:
+            # Handle edges carefully
+            if f == 0:
+                S_clean[f, :] = S[f + 1, :]
+            elif f == F - 1:
+                S_clean[f, :] = S[f - 1, :]
+            else:
+                # Interpolate from neighbors
+                S_clean[f, :] = 0.5 * (S[f - 1, :] + S[f + 1, :])
+
+    return S_clean
 
 # reconstruct spectrogram
 
