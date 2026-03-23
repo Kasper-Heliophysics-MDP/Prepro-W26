@@ -35,19 +35,13 @@ def persistence_score(S, mu, sigma, k=2.0):
     P = np.mean(S > theta[:, None], axis=1)
     return P
 
-    
+def compute_persistence_scores(S, k=2.0):
+    mu = temporal_median_intensity(S)
+    sigma = temporal_variability(S, mu)
+    P = persistence_score(S, mu, sigma, k=k)
+    return P, mu, sigma
 
-
-
-        
-
-
-
-
-# computer persistence scores 
-
-
-def classify_channels(P, alpha = 0.4) :
+def classify_channels(P, alpha = 0.4):
     return (P > alpha).astype(int)
 
 # Binary mask: 1 = suppress, 0 = keep
@@ -55,7 +49,6 @@ def build_suppression_mask(P, alpha = 0.4):
     M = (P > alpha).astype(int)
     return M
 
-# supress persistent channels 
 def suppress_persistent_channels(S, M):
     """
     Apply frequency-aware suppression using interpolation.
@@ -79,6 +72,26 @@ def suppress_persistent_channels(S, M):
 
     return S_clean
 
-# reconstruct spectrogram
+def reconstruct_spectogram(S_original, S_clean, M):
+    # Combine suppressed background with preserved signals.
+    # Currectly equivalent to S_clean, but structured for functionality
+    # Future: could blend instead of hard replace
+    return S_clean
+
+def run_fpbs(S, k=2.0, alpha=0.4):
+    """
+    Runs the full FPBS pipeline.
+    Returns:
+        S_final : cleaned spectogram
+        P       : persistence scores
+        M       : suppression mask
+        mu      : median intensity per frequency
+        sigma   : variability per frequency
+    """
+    P, mu, sigma = compute_persistence_scores(S, k=k)
+    M = build_suppression_mask(P, alpha=alpha)
+    S_clean = suppress_persistent_channels(S, M)
+    S_final = reconstruct_spectogram(S, S_clean, M)
+    return S_final, P, M, mu, sigma
 
 # evaluation 
