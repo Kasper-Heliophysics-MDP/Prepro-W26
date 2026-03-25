@@ -3,6 +3,6 @@ Preprocessing methods implemented by the Winter 2026 cohort
 
 Authors: Maria Herrmann, Ella Ricci, Zoe Fisch
 
-FPBS.py 
+## `FPBS.py`
 run with:
-python FPBS.py <specrogram.npy> 
+`python FPBS.py <specrogram.npy> `
