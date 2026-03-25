@@ -2,6 +2,9 @@
 .venv/
 venv/
 
+test_spec.py 
+plot_npy.py
+
 # Python 
 __pycache__/
 *.py[codz]
