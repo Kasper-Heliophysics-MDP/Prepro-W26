@@ -22,3 +22,6 @@ __pycache__/
 *.npy
 *.csv
 *.png
+
+# Last semester functions to help
+Prepro-F25/
