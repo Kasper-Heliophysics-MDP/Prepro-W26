@@ -140,12 +140,8 @@ if __name__ == "__main__":
 
     print("Input shape:", S.shape)
 
-    # --- SHOW ORIGINAL ---
-    print("Showing ORIGINAL spectrogram...")
-    plot_spectrogram(S)
-
     # --- RUN FPBS ---
-    S_clean, P, M, mu, sigma = run_fpbs(S, k=1.0, alpha=0.3)
+    S_clean, P, M, mu, sigma = run_fpbs(S, k=3, alpha=0.3)
 
     print("FPBS completed")
     print("Suppressed channels:", np.where(M == 1)[0])
@@ -155,10 +151,53 @@ if __name__ == "__main__":
     np.save("fpbs_cleaned.npy", S_clean)
     print("Saved cleaned spectrogram → fpbs_cleaned.npy")
 
-    # --- SHOW CLEANED ---
-    print("Showing CLEANED spectrogram...")
-    plot_spectrogram(S_clean)
+    # --- COMBINED PLOT ---
+    removed = S - S_clean
 
-    # --- SHOW REMOVED ---
-    print("Showing REMOVED signal...")
-    plot_spectrogram(S - S_clean)
+    vmin = np.min(S)
+    vmax = np.max(S)
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    im0 = axes[0].imshow(
+        S,
+        aspect="auto",
+        origin="lower",
+        cmap="viridis",
+        vmin=vmin,
+        vmax=vmax,
+        interpolation="nearest"
+    )
+    axes[0].set_title("Original Spectrogram")
+    axes[0].set_xlabel("Time index")
+    axes[0].set_ylabel("Frequency bin")
+    fig.colorbar(im0, ax=axes[0], label="Intensity")
+
+    im1 = axes[1].imshow(
+        S_clean,
+        aspect="auto",
+        origin="lower",
+        cmap="viridis",
+        vmin=vmin,
+        vmax=vmax,
+        interpolation="nearest"
+    )
+    axes[1].set_title("Cleaned Spectrogram")
+    axes[1].set_xlabel("Time index")
+    axes[1].set_ylabel("Frequency bin")
+    fig.colorbar(im1, ax=axes[1], label="Intensity")
+
+    im2 = axes[2].imshow(
+        removed,
+        aspect="auto",
+        origin="lower",
+        cmap="viridis",
+        interpolation="nearest"
+    )
+    axes[2].set_title("Removed Signal")
+    axes[2].set_xlabel("Time index")
+    axes[2].set_ylabel("Frequency bin")
+    fig.colorbar(im2, ax=axes[2], label="Intensity")
+
+    plt.tight_layout()
+    plt.show()
