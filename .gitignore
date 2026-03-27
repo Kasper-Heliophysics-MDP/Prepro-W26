@@ -2,8 +2,14 @@
 .venv/
 venv/
 
+# Preprocessing 2025 Methods
 test_spec.py 
 plot_npy.py
+AGBS.py 
+AMF.py 
+one_day.py
+computer_snr.py 
+
 
 # Python 
 __pycache__/
