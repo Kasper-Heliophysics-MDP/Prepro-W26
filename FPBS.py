@@ -2,19 +2,22 @@
 Frequency-Persistent Background Suppression for post-AGBS/AMF spectrograms.
 """
 import sys
+from pathlib import Path
+
 import numpy as np
 
 EPS = 1e-8
 FREQ_WINDOW = 7
-QUANTILE = 0.35
+QUANTILE = 0.9
 BAND_WINDOW = 17
-BAND_THRESHOLD_SIGMA = 0.2
+BAND_THRESHOLD_SIGMA = 0.02
 PERSISTENCE_THRESHOLD_SIGMA = 0.3
 BURST_SIGMA_THRESHOLD = 1
-PERSISTENCE_SMOOTH_WINDOW = 9
+PERSISTENCE_SMOOTH_WINDOW = 21
 PERSISTENCE_HIT_FRACTION = 0.2
 MIN_OCCUPANCY = 0.2
-ROW_FLAG_THRESHOLD = 0.5
+ROW_FLAG_THRESHOLD = 0.35
+SUPPRESSION_GAIN = 2.4
 
 def validate_spectrogram(S):
     if S.size == 0:
@@ -35,29 +38,7 @@ def frequency_median_filter(S, window):
 def moving_average_1d(x, window):
     return np.convolve(x, np.ones(window, dtype=float) / window, mode="same")
 
-def interpolate_flagged_rows(S, bad_rows):
-    S_out = S.copy()
-    F = S.shape[0]
-
-    for r in np.where(bad_rows)[0]:
-        up = r - 1
-        while up >= 0 and bad_rows[up]:
-            up -= 1
-
-        down = r + 1
-        while down < F and bad_rows[down]:
-            down += 1
-
-        if up >= 0 and down < F:
-            S_out[r, :] = 0.5 * (S[up, :] + S[down, :])
-        elif up >= 0:
-            S_out[r, :] = S[up, :]
-        elif down < F:
-            S_out[r, :] = S[down, :]
-
-    return S_out
-
-def run_fpbs(S):
+def analyze_persistent_bands(S):
     validate_spectrogram(S)
     column_energy = np.median(S, axis=0)
     col_med = np.median(column_energy)
@@ -79,28 +60,44 @@ def run_fpbs(S):
 
         strong = row_valid[row_valid >= row_med + BAND_THRESHOLD_SIGMA * row_mad]
         if strong.size:
-            band_level[row] = np.median(strong)
+            band_level[row] = np.quantile(strong, QUANTILE)
 
         hits = (row_valid >= row_med + PERSISTENCE_THRESHOLD_SIGMA * row_mad).astype(float)
         persistence[row] = np.mean(moving_average_1d(hits, PERSISTENCE_SMOOTH_WINDOW) >= PERSISTENCE_HIT_FRACTION)
 
-    baseline = running_median_1d(band_level, BAND_WINDOW)
+    raw_band_level = band_level.copy()
+    baseline = running_median_1d(raw_band_level, BAND_WINDOW)
     radius = BAND_WINDOW // 2
-    padded = np.pad(band_level, (radius, radius), mode="edge")
+    padded = np.pad(raw_band_level, (radius, radius), mode="edge")
     scale = np.array(
-        [1.4826 * np.median(np.abs(padded[i : i + BAND_WINDOW] - baseline[i])) + EPS for i in range(band_level.shape[0])],
+        [1.4826 * np.median(np.abs(padded[i : i + BAND_WINDOW] - baseline[i])) + EPS for i in range(raw_band_level.shape[0])],
         dtype=float,
     )
 
-    contrast = np.clip((band_level - baseline) / scale / 1.5, 0.0, 1.0)
+    band_level = running_median_1d(raw_band_level, 5)
+    contrast = np.clip((raw_band_level - baseline) / scale, 0.0, 1.0)
     occupancy = np.clip((persistence - MIN_OCCUPANCY) / max(1.0 - MIN_OCCUPANCY, EPS), 0.0, 1.0)
     weights = np.maximum(contrast, occupancy)
+    weights = running_median_1d(weights, 5)
 
-    cleaned = S - (weights * band_level)[:, np.newaxis]
+    band_rows = running_median_1d((weights > ROW_FLAG_THRESHOLD).astype(float), 5) > 0.4
+    weights[band_rows] = np.maximum(weights[band_rows], ROW_FLAG_THRESHOLD)
+    weights = np.clip(weights, 0.0, 1.0)
 
-    bad_rows = weights > ROW_FLAG_THRESHOLD
-    cleaned = interpolate_flagged_rows(cleaned, bad_rows)
+    return band_level, weights, valid_cols
 
+def has_persistent_bands(S):
+    band_level, weights, _ = analyze_persistent_bands(S)
+    return bool(np.any((weights > ROW_FLAG_THRESHOLD) & (band_level > 0)))
+
+def get_persistent_band_rows(S):
+    band_level, weights, _ = analyze_persistent_bands(S)
+    return np.where((weights > ROW_FLAG_THRESHOLD) & (band_level > 0))[0]
+
+def run_fpbs(S):
+    band_level, weights, valid_cols = analyze_persistent_bands(S)
+    cleaned = S.copy()
+    cleaned[:, valid_cols] -= (SUPPRESSION_GAIN * weights * band_level)[:, np.newaxis]
     return cleaned
 
 def plot_results(S, S_clean):
@@ -165,5 +162,19 @@ if __name__ == "__main__":
         print("Usage: python FPBS.py <spectrogram.npy>")
         sys.exit(1)
 
-    spectrogram = np.load(sys.argv[1])
-    plot_results(spectrogram, run_fpbs(spectrogram))
+    input_path = Path(sys.argv[1])
+    spectrogram = np.load(input_path)
+    persistent_rows = get_persistent_band_rows(spectrogram)
+
+    if persistent_rows.size == 0:
+        print("No persistent bands detected.")
+        sys.exit(0)
+
+    print(f"Persistent bands detected in rows: {persistent_rows.tolist()}")
+    cleaned = run_fpbs(spectrogram)
+
+    output_path = input_path.with_name(f"{input_path.stem}-FPBS.npy")
+    np.save(output_path, cleaned)
+    print(f"Saved cleaned spectrogram to {output_path}")
+
+    plot_results(spectrogram, cleaned)
