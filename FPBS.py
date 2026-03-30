@@ -1,9 +1,14 @@
 """
+File: FPBS.py 
+Author: Zoe Fisch, Maria Hermann, Ella Ricci
+Date: 2026-29-3
+Group: University of Michigan SunRISE Mission
+Description:
 Frequency-Persistent Background Suppression for post-AGBS/AMF spectrograms.
 """
+
 import sys
 from pathlib import Path
-
 import numpy as np
 
 EPS = 1e-8
@@ -19,25 +24,30 @@ MIN_OCCUPANCY = 0.2
 ROW_FLAG_THRESHOLD = 0.35
 SUPPRESSION_GAIN = 2.4
 
+# Ensures spectrogram exists in the correct dimensions
 def validate_spectrogram(S):
     if S.size == 0:
         raise ValueError("Input spectrogram must not be empty")
     if S.ndim != 2:
         raise ValueError(f"Input spectrogram must be 2D, got {S.ndim}D")
 
+# Computes array of running medians
 def running_median_1d(x, window):
     radius = window // 2
     padded = np.pad(x, (radius, radius), mode="edge")
     return np.array([np.median(padded[i : i + window]) for i in range(x.shape[0])], dtype=float)
 
+# Replace each frequency with it's running median
 def frequency_median_filter(S, window):
     radius = window // 2
     padded = np.pad(S, ((radius, radius), (0, 0)), mode="edge")
     return np.array([np.median(padded[i : i + window], axis=0) for i in range(S.shape[0])], dtype=float)
 
+# Replace each value with the average of it's neighbors 
 def moving_average_1d(x, window):
     return np.convolve(x, np.ones(window, dtype=float) / window, mode="same")
 
+# Finds persistent frequency bands and outputs their strength, while ignoring the burst
 def analyze_persistent_bands(S):
     validate_spectrogram(S)
     column_energy = np.median(S, axis=0)
@@ -49,7 +59,6 @@ def analyze_persistent_bands(S):
 
     local_background = frequency_median_filter(S, FREQ_WINDOW)
     residual = S - local_background
-
     band_level = np.zeros(S.shape[0], dtype=float)
     persistence = np.zeros(S.shape[0], dtype=float)
 
@@ -57,7 +66,6 @@ def analyze_persistent_bands(S):
         row_valid = residual[row, valid_cols]
         row_med = np.median(row_valid)
         row_mad = 1.4826 * np.median(np.abs(row_valid - row_med)) + EPS
-
         strong = row_valid[row_valid >= row_med + BAND_THRESHOLD_SIGMA * row_mad]
         if strong.size:
             band_level[row] = np.quantile(strong, QUANTILE)
@@ -73,23 +81,22 @@ def analyze_persistent_bands(S):
         [1.4826 * np.median(np.abs(padded[i : i + BAND_WINDOW] - baseline[i])) + EPS for i in range(raw_band_level.shape[0])],
         dtype=float,
     )
-
     band_level = running_median_1d(raw_band_level, 5)
     contrast = np.clip((raw_band_level - baseline) / scale, 0.0, 1.0)
     occupancy = np.clip((persistence - MIN_OCCUPANCY) / max(1.0 - MIN_OCCUPANCY, EPS), 0.0, 1.0)
     weights = np.maximum(contrast, occupancy)
     weights = running_median_1d(weights, 5)
-
     band_rows = running_median_1d((weights > ROW_FLAG_THRESHOLD).astype(float), 5) > 0.4
     weights[band_rows] = np.maximum(weights[band_rows], ROW_FLAG_THRESHOLD)
     weights = np.clip(weights, 0.0, 1.0)
-
     return band_level, weights, valid_cols
 
+# Determines if spectrogram contains any persistent bands 
 def has_persistent_bands(S):
     band_level, weights, _ = analyze_persistent_bands(S)
     return bool(np.any((weights > ROW_FLAG_THRESHOLD) & (band_level > 0)))
 
+# Determines frequencies containing persistent bands 
 def get_persistent_band_rows(S):
     band_level, weights, _ = analyze_persistent_bands(S)
     return np.where((weights > ROW_FLAG_THRESHOLD) & (band_level > 0))[0]
@@ -100,18 +107,14 @@ def run_fpbs(S):
     cleaned[:, valid_cols] -= (SUPPRESSION_GAIN * weights * band_level)[:, np.newaxis]
     return cleaned
 
+# Plots three spectrograms: original, cleaned, difference
 def plot_results(S, S_clean):
     import matplotlib.pyplot as plt
-
     diff = S - S_clean
-
     vmin = np.min(S)
     vmax = np.max(S)
-
     diff_limit = np.max(np.abs(diff))
-
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-
     im0 = axes[0].imshow(
         S,
         aspect="auto",
@@ -139,7 +142,6 @@ def plot_results(S, S_clean):
     axes[1].set_xlabel("Time index")
     axes[1].set_ylabel("Frequency bin")
     fig.colorbar(im1, ax=axes[1], label="Intensity")
-
     im2 = axes[2].imshow(
         diff,
         aspect="auto",
@@ -172,9 +174,7 @@ if __name__ == "__main__":
 
     print(f"Persistent bands detected in rows: {persistent_rows.tolist()}")
     cleaned = run_fpbs(spectrogram)
-
     output_path = input_path.with_name(f"{input_path.stem}-FPBS.npy")
     np.save(output_path, cleaned)
     print(f"Saved cleaned spectrogram to {output_path}")
-
     plot_results(spectrogram, cleaned)
