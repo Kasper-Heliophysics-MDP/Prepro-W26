@@ -39,6 +39,33 @@ python3 FPBS.py sample_spectrogram.npy
 
 This saves a file called `sample_spectrogram-FPBS.npy`.
 
+## `batch_fpbs.py`
+
+- Purpose: Load a folder of `.npy` spectrograms, run FPBS on each one, save all
+  cleaned outputs, and create a zip archive containing the cleaned
+  spectrograms.
+
+- Key Functions:
+  - `clean_folder(input_dir, output_dir)`: Runs FPBS on every `.npy` file in an
+    input folder and saves cleaned outputs to the output folder.
+  - `zip_outputs(output_dir, zip_path)`: Compresses the cleaned output files
+    into a single zip archive.
+
+- Usage:
+
+```bash
+python3 batch_fpbs.py <folder_of_npy_files> [output_zip_path]
+```
+
+- Example:
+
+```bash
+python3 batch_fpbs.py fake_spectrograms
+```
+
+This creates a folder called `fake_spectrograms-FPBS-cleaned` and a zip archive
+called `fake_spectrograms-FPBS-cleaned.zip`.
+
 ## `evaluate_spectrogram.py`
 
 - Purpose: Load a `.npy` spectrogram, run FPBS on it, and print how well the

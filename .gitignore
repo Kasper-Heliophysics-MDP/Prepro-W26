@@ -34,3 +34,6 @@ __pycache__/
 
 # Last semester functions to help
 Prepro-F25/
+
+# Local synthetic test data
+fake_spectrograms/
